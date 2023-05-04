@@ -79,12 +79,50 @@ float maxError(float *a, int n)
   return maxE;
 }
 
+void do_async(const int n,
+              float *a, float *d_a,
+              cudaEvent_t startEvent, cudaEvent_t stopEvent,
+              cudaStream_t *stream, const int nStreams) {
+  const int bytes = n * sizeof(float);
+  const int streamSize = n / nStreams;
+  const int streamBytes = streamSize * sizeof(float);
+  const int blockSize = 256;
+
+  PUSH_RANGE("memset", 1);
+  memset(a, 0, bytes);
+  POP_RANGE();
+  checkCuda( cudaEventRecord(startEvent,0) );
+  for (int i = 0; i < nStreams; ++i) {
+    int offset = i * streamSize;
+    checkCuda( cudaMemcpyAsync(&d_a[offset], &a[offset],
+                               streamBytes, cudaMemcpyHostToDevice,
+                               stream[i]) );
+    kernel<<<streamSize/blockSize, blockSize, 0, stream[i]>>>(d_a, offset);
+    checkCuda( cudaMemcpyAsync(&a[offset], &d_a[offset],
+                               streamBytes, cudaMemcpyDeviceToHost,
+                               stream[i]) );
+  }
+  checkCuda( cudaEventRecord(stopEvent, 0) );
+  checkCuda( cudaEventSynchronize(stopEvent) );
+  float ms;
+  checkCuda( cudaEventElapsedTime(&ms, startEvent, stopEvent) );
+  PUSH_RANGE("maxError", 3);
+  auto max_error = maxError(a, n);
+  POP_RANGE();
+  PUSH_RANGE("printf", 2);
+  printf("Time for asynchronous transfer and execute, %2d streams (ms): %f\n",
+         nStreams, ms);
+  printf("  max error: %e\n", max_error);
+  POP_RANGE();
+}
+
+
 int main(int argc, char **argv)
 {
   const int blockSize = 256;
   const int n = 128 * 1024 * blockSize;
   const int bytes = n * sizeof(float);
-   
+
   int devId = 0;
   if (argc > 1) devId = atoi(argv[1]);
 
@@ -129,37 +167,7 @@ int main(int argc, char **argv)
   printf("  max error: %e\n", max_error);
   POP_RANGE();
 
-  // asynchronous version 1: 4 streams
-  {
-    const int nStreams = 4;
-    const int streamSize = n / nStreams;
-    const int streamBytes = streamSize * sizeof(float);
-    PUSH_RANGE("memset", 1);
-    memset(a, 0, bytes);
-    POP_RANGE();
-    checkCuda( cudaEventRecord(startEvent,0) );
-    for (int i = 0; i < nStreams; ++i) {
-      int offset = i * streamSize;
-      checkCuda( cudaMemcpyAsync(&d_a[offset], &a[offset],
-                                 streamBytes, cudaMemcpyHostToDevice,
-                                 stream[i]) );
-      kernel<<<streamSize/blockSize, blockSize, 0, stream[i]>>>(d_a, offset);
-      checkCuda( cudaMemcpyAsync(&a[offset], &d_a[offset],
-                                 streamBytes, cudaMemcpyDeviceToHost,
-                                 stream[i]) );
-    }
-    checkCuda( cudaEventRecord(stopEvent, 0) );
-    checkCuda( cudaEventSynchronize(stopEvent) );
-    checkCuda( cudaEventElapsedTime(&ms, startEvent, stopEvent) );
-    PUSH_RANGE("maxError", 3);
-    auto max_error = maxError(a, n);
-    POP_RANGE();
-    PUSH_RANGE("printf", 2);
-    printf("Time for asynchronous transfer and execute,  4 streams (ms): %f\n", ms);
-    printf("  max error: %e\n", max_error);
-    POP_RANGE();
-  }
-
+  do_async(n, a, d_a, startEvent, stopEvent, stream, 4);
   // cleanup
   checkCuda( cudaEventDestroy(startEvent) );
   checkCuda( cudaEventDestroy(stopEvent) );
