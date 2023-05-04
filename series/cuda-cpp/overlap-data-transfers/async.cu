@@ -168,6 +168,7 @@ int main(int argc, char **argv)
   POP_RANGE();
 
   do_async(n, a, d_a, startEvent, stopEvent, stream, 4);
+  do_async(n, a, d_a, startEvent, stopEvent, stream, 32);
   // cleanup
   checkCuda( cudaEventDestroy(startEvent) );
   checkCuda( cudaEventDestroy(stopEvent) );
