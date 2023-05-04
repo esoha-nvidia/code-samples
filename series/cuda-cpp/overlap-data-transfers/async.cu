@@ -82,7 +82,7 @@ float maxError(float *a, int n)
 int main(int argc, char **argv)
 {
   const int blockSize = 256, nStreams = 4;
-  const int n = 4 * 1024 * blockSize * nStreams;
+  const int n = 128 * 1024 * blockSize;
   const int streamSize = n / nStreams;
   const int streamBytes = streamSize * sizeof(float);
   const int bytes = n * sizeof(float);
