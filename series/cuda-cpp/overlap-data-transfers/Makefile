@@ -1,5 +1,5 @@
 async: async.cu
-	nvcc -o $@ $?
+	nvcc -lnvToolsExt -o $@ $?
 
 run: async
 	./async

@@ -26,6 +26,25 @@
  */
 
 #include <stdio.h>
+#include <stdint.h>
+#include "nvToolsExt.h"
+
+const uint32_t colors[] = { 0xff00ff00, 0xff0000ff, 0xffffff00, 0xffff00ff, 0xff00ffff, 0xffff0000, 0xffffffff };
+const int num_colors = sizeof(colors)/sizeof(uint32_t);
+
+#define PUSH_RANGE(name,cid) do {                       \
+    int color_id = cid;                                 \
+    color_id = color_id%num_colors;                     \
+    nvtxEventAttributes_t eventAttrib = {0};            \
+    eventAttrib.version = NVTX_VERSION;                 \
+    eventAttrib.size = NVTX_EVENT_ATTRIB_STRUCT_SIZE;   \
+    eventAttrib.colorType = NVTX_COLOR_ARGB;            \
+    eventAttrib.color = colors[color_id];               \
+    eventAttrib.messageType = NVTX_MESSAGE_TYPE_ASCII;  \
+    eventAttrib.message.ascii = name;                   \
+    nvtxRangePushEx(&eventAttrib);                      \
+  } while(0)
+#define POP_RANGE() nvtxRangePop()
 
 // Convenience function for checking CUDA runtime API results
 // can be wrapped around any runtime API call. No-op in release builds.
@@ -93,7 +112,9 @@ int main(int argc, char **argv)
     checkCuda( cudaStreamCreate(&stream[i]) );
   
   // baseline case - sequential transfer and execute
+  PUSH_RANGE("memset", 1);
   memset(a, 0, bytes);
+  POP_RANGE();
   checkCuda( cudaEventRecord(startEvent,0) );
   checkCuda( cudaMemcpy(d_a, a, bytes, cudaMemcpyHostToDevice) );
   kernel<<<n/blockSize, blockSize>>>(d_a, 0);
@@ -101,11 +122,15 @@ int main(int argc, char **argv)
   checkCuda( cudaEventRecord(stopEvent, 0) );
   checkCuda( cudaEventSynchronize(stopEvent) );
   checkCuda( cudaEventElapsedTime(&ms, startEvent, stopEvent) );
+  PUSH_RANGE("printf", 2);
   printf("Time for sequential transfer and execute (ms): %f\n", ms);
   printf("  max error: %e\n", maxError(a, n));
+  POP_RANGE();
 
   // asynchronous version 1: loop over {copy, kernel, copy}
+  PUSH_RANGE("memset", 1);
   memset(a, 0, bytes);
+  POP_RANGE();
   checkCuda( cudaEventRecord(startEvent,0) );
   for (int i = 0; i < nStreams; ++i) {
     int offset = i * streamSize;
@@ -120,12 +145,16 @@ int main(int argc, char **argv)
   checkCuda( cudaEventRecord(stopEvent, 0) );
   checkCuda( cudaEventSynchronize(stopEvent) );
   checkCuda( cudaEventElapsedTime(&ms, startEvent, stopEvent) );
+  PUSH_RANGE("printf", 2);
   printf("Time for asynchronous V1 transfer and execute (ms): %f\n", ms);
   printf("  max error: %e\n", maxError(a, n));
+  POP_RANGE();
 
   // asynchronous version 2: 
   // loop over copy, loop over kernel, loop over copy
+  PUSH_RANGE("memset", 1);
   memset(a, 0, bytes);
+  POP_RANGE();
   checkCuda( cudaEventRecord(startEvent,0) );
   for (int i = 0; i < nStreams; ++i)
   {
@@ -149,8 +178,10 @@ int main(int argc, char **argv)
   checkCuda( cudaEventRecord(stopEvent, 0) );
   checkCuda( cudaEventSynchronize(stopEvent) );
   checkCuda( cudaEventElapsedTime(&ms, startEvent, stopEvent) );
+  PUSH_RANGE("printf", 2);
   printf("Time for asynchronous V2 transfer and execute (ms): %f\n", ms);
   printf("  max error: %e\n", maxError(a, n));
+  POP_RANGE();
 
   // cleanup
   checkCuda( cudaEventDestroy(startEvent) );
