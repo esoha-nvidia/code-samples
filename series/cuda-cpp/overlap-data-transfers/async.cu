@@ -121,9 +121,12 @@ int main(int argc, char **argv)
   checkCuda( cudaEventRecord(stopEvent, 0) );
   checkCuda( cudaEventSynchronize(stopEvent) );
   checkCuda( cudaEventElapsedTime(&ms, startEvent, stopEvent) );
+  PUSH_RANGE("maxError", 3);
+  auto max_error = maxError(a, n);
+  POP_RANGE();
   PUSH_RANGE("printf", 2);
   printf("Time for sequential transfer and execute (ms): %f\n", ms);
-  printf("  max error: %e\n", maxError(a, n));
+  printf("  max error: %e\n", max_error);
   POP_RANGE();
 
   // asynchronous version 1: 4 streams
@@ -148,9 +151,12 @@ int main(int argc, char **argv)
     checkCuda( cudaEventRecord(stopEvent, 0) );
     checkCuda( cudaEventSynchronize(stopEvent) );
     checkCuda( cudaEventElapsedTime(&ms, startEvent, stopEvent) );
+    PUSH_RANGE("maxError", 3);
+    auto max_error = maxError(a, n);
+    POP_RANGE();
     PUSH_RANGE("printf", 2);
     printf("Time for asynchronous transfer and execute,  4 streams (ms): %f\n", ms);
-    printf("  max error: %e\n", maxError(a, n));
+    printf("  max error: %e\n", max_error);
     POP_RANGE();
   }
 
