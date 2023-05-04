@@ -104,11 +104,12 @@ int main(int argc, char **argv)
   
   // create events and streams
   cudaEvent_t startEvent, stopEvent, dummyEvent;
-  cudaStream_t stream[nStreams];
+  const int maxStreams = 32;
+  cudaStream_t stream[maxStreams];
   checkCuda( cudaEventCreate(&startEvent) );
   checkCuda( cudaEventCreate(&stopEvent) );
   checkCuda( cudaEventCreate(&dummyEvent) );
-  for (int i = 0; i < nStreams; ++i)
+  for (int i = 0; i < maxStreams; ++i)
     checkCuda( cudaStreamCreate(&stream[i]) );
   
   // baseline case - sequential transfer and execute
@@ -154,7 +155,7 @@ int main(int argc, char **argv)
   checkCuda( cudaEventDestroy(startEvent) );
   checkCuda( cudaEventDestroy(stopEvent) );
   checkCuda( cudaEventDestroy(dummyEvent) );
-  for (int i = 0; i < nStreams; ++i)
+  for (int i = 0; i < maxStreams; ++i)
     checkCuda( cudaStreamDestroy(stream[i]) );
   cudaFree(d_a);
   cudaFreeHost(a);
