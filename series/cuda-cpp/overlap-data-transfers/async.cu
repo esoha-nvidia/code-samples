@@ -150,39 +150,6 @@ int main(int argc, char **argv)
   printf("  max error: %e\n", maxError(a, n));
   POP_RANGE();
 
-  // asynchronous version 2: 
-  // loop over copy, loop over kernel, loop over copy
-  PUSH_RANGE("memset", 1);
-  memset(a, 0, bytes);
-  POP_RANGE();
-  checkCuda( cudaEventRecord(startEvent,0) );
-  for (int i = 0; i < nStreams; ++i)
-  {
-    int offset = i * streamSize;
-    checkCuda( cudaMemcpyAsync(&d_a[offset], &a[offset], 
-                               streamBytes, cudaMemcpyHostToDevice,
-                               stream[i]) );
-  }
-  for (int i = 0; i < nStreams; ++i)
-  {
-    int offset = i * streamSize;
-    kernel<<<streamSize/blockSize, blockSize, 0, stream[i]>>>(d_a, offset);
-  }
-  for (int i = 0; i < nStreams; ++i)
-  {
-    int offset = i * streamSize;
-    checkCuda( cudaMemcpyAsync(&a[offset], &d_a[offset], 
-                               streamBytes, cudaMemcpyDeviceToHost,
-                               stream[i]) );
-  }
-  checkCuda( cudaEventRecord(stopEvent, 0) );
-  checkCuda( cudaEventSynchronize(stopEvent) );
-  checkCuda( cudaEventElapsedTime(&ms, startEvent, stopEvent) );
-  PUSH_RANGE("printf", 2);
-  printf("Time for asynchronous V2 transfer and execute (ms): %f\n", ms);
-  printf("  max error: %e\n", maxError(a, n));
-  POP_RANGE();
-
   // cleanup
   checkCuda( cudaEventDestroy(startEvent) );
   checkCuda( cudaEventDestroy(stopEvent) );
